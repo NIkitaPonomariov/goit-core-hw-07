@@ -1,6 +1,7 @@
-from datetime import datetime
+import pickle
+from datetime import datetime, timedelta
 from collections import UserDict
-from datetime import timedelta
+import re
 
 class AddressBook(UserDict):
     def add_record(self, record):
@@ -18,10 +19,15 @@ class AddressBook(UserDict):
         upcoming_birthdays = []
         for record in self.data.values():
             if record.birthday:
-                birthday = record.birthday.value.replace(year=today.year)
-                if today <= birthday <= today + timedelta(days=7):
+                birthday_this_year = record.birthday.value.replace(year=today.year)
+                if today <= birthday_this_year <= today + timedelta(days=7):
                     upcoming_birthdays.append(record)
+                elif birthday_this_year < today:
+                    birthday_next_year = record.birthday.value.replace(year=today.year + 1)
+                    if today <= birthday_next_year <= today + timedelta(days=7):
+                        upcoming_birthdays.append(record)
         return upcoming_birthdays
+
 
 class Field:
     def __init__(self, value):
@@ -32,8 +38,6 @@ class Field:
 
 class Name(Field):
     pass
-
-import re
 
 class Phone(Field):
     def __init__(self, value):
@@ -47,6 +51,8 @@ class Birthday(Field):
             self.value = datetime.strptime(value, "%d.%m.%Y").date()
         except ValueError:
             raise ValueError("Invalid date format. Use DD.MM.YYYY")
+
+
 
 class Record:
     def __init__(self, name):
@@ -72,8 +78,6 @@ class Record:
         birthday = self.birthday.value.strftime("%d.%m.%Y") if self.birthday else "N/A"
         return f"Contact name: {self.name.value}, phones: {phones}, birthday: {birthday}"
 
-
-
 def input_error(handler):
     def wrapper(*args, **kwargs):
         try:
@@ -81,6 +85,17 @@ def input_error(handler):
         except (IndexError, ValueError) as e:
             return str(e)
     return wrapper
+
+def save_data(book, filename="addressbook.pkl"):
+    with open(filename, "wb") as f:
+        pickle.dump(book, f)
+
+def load_data(filename="addressbook.pkl"):
+    try:
+        with open(filename, "rb") as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        return AddressBook()  # Повернення нової адресної книги, якщо файл не знайдено
 
 @input_error
 def add_contact(args, book):
@@ -145,7 +160,7 @@ def parse_input(user_input):
     return user_input.split()
 
 def main():
-    book = AddressBook()
+    book = load_data()
     print("Welcome to the assistant bot!")
     commands = {
         "add": add_contact,
@@ -162,6 +177,7 @@ def main():
         command, *args = parse_input(user_input)
 
         if command in ["close", "exit"]:
+            save_data(book)
             print("Good bye!")
             break
 
@@ -170,4 +186,5 @@ def main():
         else:
             print("Invalid command.")
 
-main()
+if __name__ == "__main__":
+    main()
